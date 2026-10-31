@@ -1,40 +1,48 @@
-
-import express from "express";
-import { MongoClient } from "mongodb";
 import "dotenv/config";
+import express from "express";
+import cors from "cors";
+
+import { connectToMongoDB } from "./config/db.js";
+import studioRoutes from "./routes/studioRoutes.js";
 
 const app = express();
-const PORT = 8000;
+const PORT = process.env.PORT || 8000;
 
-const client = new MongoClient(process.env.MONGODB_URI);
+// Middleware
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    credentials: true,
+  })
+);
 
-export async function connectToMongoDB() {
+app.use(express.json());
+
+// Home route
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "StudioSpace server is running!",
+  });
+});
+
+// Studio routes
+app.use("/studios", studioRoutes);
+
+// Start server
+async function startServer() {
   try {
-    await client.connect();
-    console.log("You successfully connected to MongoDB!");
-    return client;
-  } catch (err) {
-    console.error("MongoDB connection failed:", err);
+    await connectToMongoDB();
+
+    app.listen(PORT, () => {
+      console.log(`StudioSpace server running at http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error("Server startup failed:", error);
     process.exit(1);
   }
 }
 
-export async function disconnectFromMongoDB() {
-  await client.close();
-}
-
-// Home route
-app.get("/", (req, res) => {
-  res.send({ message: "Server is running fine!" });
-});
-
-// Connect MongoDB first, then start server
-async function startServer() {
-  await connectToMongoDB();
-
-  app.listen(PORT, () => {
-    console.log(`Server is running at ${PORT}`);
-  });
-}
-
 startServer();
+
+export default app;
