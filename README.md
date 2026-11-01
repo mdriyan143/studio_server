@@ -28,6 +28,44 @@ The server communicates with the Next.js frontend and uses Better Auth JWT verif
 - **MongoDB Integration:** Store and manage application data using MongoDB collections.
 - **CORS Configuration:** Allow secure communication between the frontend and backend.
 
+## Tech Stack
+
+- Node.js, Express.js
+- MongoDB (official driver)
+- jose (JWT verification with Better Auth JWKS)
+- CORS, dotenv
+
+## Repositories
+
+- Client: https://github.com/mdriyan143/studio-space
+- Server: [your server repo URL]
+
+## Local Setup
+
+1. Clone the repo and go into the folder
+   git clone [your server repo URL]
+   cd studio_server
+2. Install dependencies
+   npm install
+3. Create a `.env` file in the project root
+   PORT=8000
+   MONGODB_URI=your_mongodb_connection_string
+   DB_NAME=studiospace
+   CLIENT_URL=http://localhost:3000
+4. Start the server
+   npm start
+   The API runs at http://localhost:8000
+
+`CLIENT_URL` must match your client URL exactly (no trailing slash), because the server fetches the public keys from `CLIENT_URL/api/auth/jwks`.
+
+## Security (JWT)
+
+Users log in through Better Auth, which stores the session in an HTTPOnly cookie, so JavaScript on the page can never read the token. When the client calls a protected route, the request goes through the Next.js proxy (`/api/proxy`). The proxy reads the cookie, creates a JWT on the server, and forwards the request to this Express server. Express verifies the JWT against the Better Auth JWKS and rejects missing or invalid tokens with `401 Unauthorized`. Protected routes: add, update and delete studio, create booking, my bookings, wishlist, and reviews.
+
+## Double-Booking Prevention
+
+Before a booking is saved (and again when a host confirms it), the server checks for overlapping time on the same studio and date against all `Confirmed` bookings. If there is an overlap, it returns `409` with a clear message.
+
 ## Technology Stack
 
 - Node.js
