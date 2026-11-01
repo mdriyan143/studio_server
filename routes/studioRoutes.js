@@ -50,6 +50,15 @@ function validateStudioBody(body) {
   return { rate, deposit, capacity };
 }
 
+// Keeps only http(s) links, removes duplicates, max 8 gallery images
+function cleanGallery(gallery) {
+  if (!Array.isArray(gallery)) return [];
+  const urls = gallery
+    .filter((u) => typeof u === "string" && /^https?:\/\/.+/i.test(u.trim()))
+    .map((u) => u.trim());
+  return [...new Set(urls)].slice(0, 8);
+}
+
 // Get all studios (Public) — supports ?limit=6&category=Photo Studio&search=loft
 router.get("/", async (req, res) => {
   try {
@@ -141,7 +150,7 @@ router.post("/", verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: checked.error });
     }
 
-    const { title, category, location, imageUrl, amenities, overview } =
+    const { title, category, location, imageUrl, amenities, overview, gallery } =
       req.body;
 
     const studioData = {
@@ -153,6 +162,7 @@ router.post("/", verifyToken, async (req, res) => {
       location,
       imageUrl,
       amenities: Array.isArray(amenities) ? amenities : [],
+      gallery: cleanGallery(gallery),
       overview,
       ownerId: req.user.id,
       ownerEmail: req.user.email,
@@ -197,7 +207,7 @@ router.patch("/:id", verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: checked.error });
     }
 
-    const { title, category, location, imageUrl, amenities, overview } =
+    const { title, category, location, imageUrl, amenities, overview, gallery } =
       req.body;
 
     const result = await studioCollection.updateOne(
@@ -212,6 +222,7 @@ router.patch("/:id", verifyToken, async (req, res) => {
           location,
           imageUrl,
           amenities: Array.isArray(amenities) ? amenities : [],
+          gallery: cleanGallery(gallery),
           overview,
           updatedAt: new Date(),
         },
