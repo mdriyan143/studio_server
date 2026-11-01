@@ -4,6 +4,7 @@ import cors from "cors";
 
 import { connectToMongoDB } from "./config/db.js";
 import studioRoutes from "./routes/studioRoutes.js";
+import bookingRoutes from "./routes/bookingRoutes.js";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -26,8 +27,8 @@ app.get("/", (req, res) => {
   });
 });
 
-// Studio routes
 app.use("/studios", studioRoutes);
+app.use("/bookings", bookingRoutes);
 
 // Start server
 async function startServer() {

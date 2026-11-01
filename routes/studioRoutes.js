@@ -47,37 +47,33 @@ router.get("/mine", verifyToken, async (req, res) => {
   }
 });
 
-// Get one studio (Public)
-router.get("/:id", async (req, res) => {
+
+// Get all studios (Public) — supports ?limit=6&category=Photo Studio&search=loft
+router.get("/", async (req, res) => {
   try {
-    const { id } = req.params;
+    const { limit, category, search } = req.query;
 
-    if (!ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid studio ID.",
-      });
+    const filter = {};
+    if (category) filter.category = category;
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { location: { $regex: search, $options: "i" } },
+      ];
     }
 
-    const studio = await studioCollection.findOne({
-      _id: new ObjectId(id),
-    });
+    let cursor = studioCollection.find(filter).sort({ createdAt: -1 });
 
-    if (!studio) {
-      return res.status(404).json({
-        success: false,
-        message: "Studio not found.",
-      });
-    }
+    const max = Number(limit);
+    if (Number.isInteger(max) && max > 0) cursor = cursor.limit(max);
 
-    res.json({
-      success: true,
-      data: studio,
-    });
+    const studios = await cursor.toArray();
+
+    res.json({ success: true, data: studios });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Failed to fetch studio.",
+      message: "Failed to fetch studios.",
     });
   }
 });
