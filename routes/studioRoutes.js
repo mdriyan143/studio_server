@@ -7,46 +7,48 @@ const router = express.Router();
 
 const studioCollection = db.collection("studios");
 
-// Get all studios (Public)
-router.get("/", async (req, res) => {
-  try {
-    const studios = await studioCollection
-      .find()
-      .sort({ createdAt: -1 })
-      .toArray();
+function validateStudioBody(body) {
+  const {
+    title,
+    category,
+    hourlyRate,
+    securityDeposit,
+    maxCapacity,
+    location,
+    imageUrl,
+    overview,
+  } = body;
 
-    res.json({
-      success: true,
-      data: studios,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch studios.",
-    });
+  if (
+    !title ||
+    !category ||
+    hourlyRate == null ||
+    securityDeposit == null ||
+    maxCapacity == null ||
+    !location ||
+    !imageUrl ||
+    !overview
+  ) {
+    return { error: "Please provide all required studio information." };
   }
-});
 
-// Get user's studios (Protected)
-router.get("/mine", verifyToken, async (req, res) => {
-  try {
-    const studios = await studioCollection
-      .find({ ownerId: req.user.id })
-      .sort({ createdAt: -1 })
-      .toArray();
+  const rate = Number(hourlyRate);
+  const deposit = Number(securityDeposit);
+  const capacity = Number(maxCapacity);
 
-    res.json({
-      success: true,
-      data: studios,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch your studios.",
-    });
+  if (
+    !Number.isFinite(rate) ||
+    !Number.isFinite(deposit) ||
+    !Number.isInteger(capacity) ||
+    rate < 0 ||
+    deposit < 0 ||
+    capacity < 1
+  ) {
+    return { error: "Please provide valid pricing and capacity values." };
   }
-});
 
+  return { rate, deposit, capacity };
+}
 
 // Get all studios (Public) — supports ?limit=6&category=Photo Studio&search=loft
 router.get("/", async (req, res) => {
@@ -54,11 +56,14 @@ router.get("/", async (req, res) => {
     const { limit, category, search } = req.query;
 
     const filter = {};
-    if (category) filter.category = category;
-    if (search) {
+    if (typeof category === "string" && category.trim()) {
+      filter.category = category.trim();
+    }
+    if (typeof search === "string" && search.trim()) {
+      const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       filter.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { location: { $regex: search, $options: "i" } },
+        { title: { $regex: escaped, $options: "i" } },
+        { location: { $regex: escaped, $options: "i" } },
       ];
     }
 
@@ -71,6 +76,7 @@ router.get("/", async (req, res) => {
 
     res.json({ success: true, data: studios });
   } catch (error) {
+    console.error("List studios error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch studios.",
@@ -78,61 +84,72 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Get user's studios (Protected) — must stay above "/:id"
+router.get("/mine", verifyToken, async (req, res) => {
+  try {
+    const studios = await studioCollection
+      .find({ ownerId: req.user.id })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.json({ success: true, data: studios });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch your studios.",
+    });
+  }
+});
+
+// Get one studio (Public)
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid studio ID.",
+      });
+    }
+
+    const studio = await studioCollection.findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!studio) {
+      return res.status(404).json({
+        success: false,
+        message: "Studio not found.",
+      });
+    }
+
+    res.json({ success: true, data: studio });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch studio.",
+    });
+  }
+});
+
 // Add a studio (Protected)
 router.post("/", verifyToken, async (req, res) => {
   try {
-    const {
-      title,
-      category,
-      hourlyRate,
-      securityDeposit,
-      maxCapacity,
-      location,
-      imageUrl,
-      amenities,
-      overview,
-    } = req.body;
-
-    if (
-      !title ||
-      !category ||
-      hourlyRate == null ||
-      securityDeposit == null ||
-      maxCapacity == null ||
-      !location ||
-      !imageUrl ||
-      !overview
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide all required studio information.",
-      });
+    const checked = validateStudioBody(req.body);
+    if (checked.error) {
+      return res.status(400).json({ success: false, message: checked.error });
     }
 
-    const rate = Number(hourlyRate);
-    const deposit = Number(securityDeposit);
-    const capacity = Number(maxCapacity);
-
-    if (
-      !Number.isFinite(rate) ||
-      !Number.isFinite(deposit) ||
-      !Number.isInteger(capacity) ||
-      rate < 0 ||
-      deposit < 0 ||
-      capacity < 1
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide valid pricing and capacity values.",
-      });
-    }
+    const { title, category, location, imageUrl, amenities, overview } =
+      req.body;
 
     const studioData = {
       title: title.trim(),
       category,
-      hourlyRate: rate,
-      securityDeposit: deposit,
-      maxCapacity: capacity,
+      hourlyRate: checked.rate,
+      securityDeposit: checked.deposit,
+      maxCapacity: checked.capacity,
       location,
       imageUrl,
       amenities: Array.isArray(amenities) ? amenities : [],
@@ -156,7 +173,6 @@ router.post("/", verifyToken, async (req, res) => {
     });
   } catch (error) {
     console.error("Add studio error:", error);
-
     res.status(500).json({
       success: false,
       message: "Failed to add studio.",
@@ -176,72 +192,29 @@ router.patch("/:id", verifyToken, async (req, res) => {
       });
     }
 
-    const {
-      title,
-      category,
-      hourlyRate,
-      securityDeposit,
-      maxCapacity,
-      location,
-      imageUrl,
-      amenities,
-      overview,
-    } = req.body;
-
-    if (
-      !title ||
-      !category ||
-      hourlyRate == null ||
-      securityDeposit == null ||
-      maxCapacity == null ||
-      !location ||
-      !imageUrl ||
-      !overview
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide all required studio information.",
-      });
+    const checked = validateStudioBody(req.body);
+    if (checked.error) {
+      return res.status(400).json({ success: false, message: checked.error });
     }
 
-    const rate = Number(hourlyRate);
-    const deposit = Number(securityDeposit);
-    const capacity = Number(maxCapacity);
-
-    if (
-      !Number.isFinite(rate) ||
-      !Number.isFinite(deposit) ||
-      !Number.isInteger(capacity) ||
-      rate < 0 ||
-      deposit < 0 ||
-      capacity < 1
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide valid pricing and capacity values.",
-      });
-    }
-
-    const updatedStudio = {
-      title: title.trim(),
-      category,
-      hourlyRate: rate,
-      securityDeposit: deposit,
-      maxCapacity: capacity,
-      location,
-      imageUrl,
-      amenities: Array.isArray(amenities) ? amenities : [],
-      overview,
-      updatedAt: new Date(),
-    };
+    const { title, category, location, imageUrl, amenities, overview } =
+      req.body;
 
     const result = await studioCollection.updateOne(
+      { _id: new ObjectId(id), ownerId: req.user.id },
       {
-        _id: new ObjectId(id),
-        ownerId: req.user.id,
-      },
-      {
-        $set: updatedStudio,
+        $set: {
+          title: title.trim(),
+          category,
+          hourlyRate: checked.rate,
+          securityDeposit: checked.deposit,
+          maxCapacity: checked.capacity,
+          location,
+          imageUrl,
+          amenities: Array.isArray(amenities) ? amenities : [],
+          overview,
+          updatedAt: new Date(),
+        },
       }
     );
 
@@ -252,13 +225,9 @@ router.patch("/:id", verifyToken, async (req, res) => {
       });
     }
 
-    res.json({
-      success: true,
-      message: "Studio updated successfully!",
-    });
+    res.json({ success: true, message: "Studio updated successfully!" });
   } catch (error) {
     console.error("Update studio error:", error);
-
     res.status(500).json({
       success: false,
       message: "Failed to update studio.",
@@ -290,13 +259,9 @@ router.delete("/:id", verifyToken, async (req, res) => {
       });
     }
 
-    res.json({
-      success: true,
-      message: "Studio deleted successfully!",
-    });
+    res.json({ success: true, message: "Studio deleted successfully!" });
   } catch (error) {
     console.error("Delete studio error:", error);
-
     res.status(500).json({
       success: false,
       message: "Failed to delete studio.",
