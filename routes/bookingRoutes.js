@@ -2,6 +2,7 @@ import express from "express";
 import { ObjectId } from "mongodb";
 import { db } from "../config/db.js";
 import { verifyToken } from "../middleware/verifyToken.js";
+import { createNotification } from "../utils/notify.js";
 
 const router = express.Router();
 
@@ -202,6 +203,14 @@ router.post("/", verifyToken, async (req, res) => {
 
     const result = await bookingCollection.insertOne(booking);
 
+    await createNotification({
+      userId: studio.ownerId,
+      type: "booking_request",
+      message: `${req.user.name || req.user.email} requested "${studio.title}" on ${date}, ${startTime}–${endTime}.`,
+      bookingId: result.insertedId,
+      studioId,
+    });
+
     res.status(201).json({
       success: true,
       message: "Booking request sent! Waiting for host confirmation.",
@@ -228,17 +237,25 @@ router.patch("/:id/cancel", verifyToken, async (req, res) => {
       });
     }
 
-    const result = await bookingCollection.updateOne(
+    const booking = await bookingCollection.findOneAndUpdate(
       { _id: new ObjectId(id), userId: req.user.id, status: "Pending" },
       { $set: { status: "Cancelled", updatedAt: new Date() } }
     );
 
-    if (result.matchedCount === 0) {
+    if (!booking) {
       return res.status(404).json({
         success: false,
         message: "Booking not found, or it can no longer be cancelled.",
       });
     }
+
+    await createNotification({
+      userId: booking.hostId,
+      type: "booking_cancelled",
+      message: `${booking.userName || booking.userEmail} cancelled their request for "${booking.studioTitle}" on ${booking.date}.`,
+      bookingId: booking._id,
+      studioId: booking.studioId,
+    });
 
     res.json({ success: true, message: "Booking cancelled." });
   } catch (error) {
@@ -317,6 +334,20 @@ router.patch("/:id/status", verifyToken, async (req, res) => {
       { _id: booking._id },
       { $set: { status, updatedAt: new Date() } }
     );
+
+    const verb = {
+      Confirmed: "confirmed",
+      Cancelled: "declined",
+      Completed: "marked as completed",
+    }[status];
+
+    await createNotification({
+      userId: booking.userId,
+      type: `booking_${status.toLowerCase()}`,
+      message: `Your booking for "${booking.studioTitle}" on ${booking.date} (${booking.startTime}–${booking.endTime}) was ${verb}.`,
+      bookingId: booking._id,
+      studioId: booking.studioId,
+    });
 
     res.json({ success: true, message: `Booking marked as ${status}.` });
   } catch (error) {

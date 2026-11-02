@@ -7,6 +7,7 @@ import studioRoutes from "./routes/studioRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import wishlistRoutes from "./routes/wishlistRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -33,6 +34,7 @@ app.use("/studios", studioRoutes);
 app.use("/bookings", bookingRoutes);
 app.use("/reviews", reviewRoutes);
 app.use("/wishlist", wishlistRoutes);
+app.use("/notifications", notificationRoutes); 
 
 // Start server
 async function startServer() {
