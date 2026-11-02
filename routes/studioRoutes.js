@@ -62,9 +62,14 @@ function cleanGallery(gallery) {
 // Get all studios (Public) — supports ?limit=6&category=Photo Studio&search=loft
 router.get("/", async (req, res) => {
   try {
-    const { limit, category, search } = req.query;
+    const { limit, category, search, ownerId } = req.query;
 
     const filter = {};
+
+    if (typeof ownerId === "string" && ownerId.trim()) {
+      filter.ownerId = ownerId.trim();
+    }
+
     if (typeof category === "string" && category.trim()) {
       filter.category = category.trim();
     }
