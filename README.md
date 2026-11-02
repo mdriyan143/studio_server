@@ -1,165 +1,25 @@
 # StudioSpace — Backend Server
 
-**Project:** StudioSpace — Peer-to-Peer Creative Workspace & Production Studio Sharing Platform
+REST API for StudioSpace (Express.js + MongoDB). It handles studios, bookings, reviews and wishlists, and verifies Better Auth JWTs.
 
-## Live Deployment
-
-- **Website:** https://studio-space-mdriyan143.vercel.app/
-- **Backend API Server:** https://studio-server-zeta.vercel.app/
-
-
-## About the Backend
-
-StudioSpace Backend is a RESTful API built with Express.js and MongoDB. It handles studio listings, booking reservations, reviews, and saved studio wishlists.
-
-The server communicates with the Next.js frontend and uses Better Auth JWT verification to authenticate protected API requests.
-
-## Key Features
-
-- **Studio Management:** Create, retrieve, update, and delete studio listings.
-- **Studio Discovery:** Retrieve all available studios and individual studio details.
-- **User Listings:** Retrieve studios belonging to the authenticated user.
-- **Booking Management:** Create reservations, retrieve personal bookings, and manage hosted bookings.
-- **Availability Checking:** Check studio booking availability before making reservations.
-- **Booking Status Management:** Cancel bookings and update reservation statuses.
-- **JWT Authentication:** Verify authentication tokens using Better Auth JWKS and the JOSE library.
-- **Review System:** Submit reviews and retrieve reviews for individual studios.
-- **Wishlist Management:** Add and remove favorite studios and retrieve saved studio information.
-- **MongoDB Integration:** Store and manage application data using MongoDB collections.
-- **CORS Configuration:** Allow secure communication between the frontend and backend.
+- **Live Site:** https://studio-space-mdriyan143.vercel.app/
+- **API Base URL:** https://studio-server-zeta.vercel.app/
+- **Client Repo:** https://github.com/mdriyan143/studio-space
+- **Server Repo:** https://github.com/mdriyan143/studio_server
 
 ## Tech Stack
 
-- Node.js, Express.js
-- MongoDB (official driver)
-- jose (JWT verification with Better Auth JWKS)
-- CORS, dotenv
-
-## Repositories
-
-- Client: https://github.com/mdriyan143/studio-space
-- Server: [your server repo URL]
+Node.js, Express 5, MongoDB driver, jose (JWT/JWKS), CORS, dotenv, Nodemon.
 
 ## Local Setup
 
-1. Clone the repo and go into the folder
-   git clone [your server repo URL]
-   cd studio_server
-2. Install dependencies
-   npm install
-3. Create a `.env` file in the project root
-   PORT=8000
-   MONGODB_URI=your_mongodb_connection_string
-   DB_NAME=studiospace
-   CLIENT_URL=http://localhost:3000
-4. Start the server
-   npm start
-   The API runs at http://localhost:8000
-
-`CLIENT_URL` must match your client URL exactly (no trailing slash), because the server fetches the public keys from `CLIENT_URL/api/auth/jwks`.
-
-## Security (JWT)
-
-Users log in through Better Auth, which stores the session in an HTTPOnly cookie, so JavaScript on the page can never read the token. When the client calls a protected route, the request goes through the Next.js proxy (`/api/proxy`). The proxy reads the cookie, creates a JWT on the server, and forwards the request to this Express server. Express verifies the JWT against the Better Auth JWKS and rejects missing or invalid tokens with `401 Unauthorized`. Protected routes: add, update and delete studio, create booking, my bookings, wishlist, and reviews.
-
-## Double-Booking Prevention
-
-Before a booking is saved (and again when a host confirms it), the server checks for overlapping time on the same studio and date against all `Confirmed` bookings. If there is an overlap, it returns `409` with a clear message.
-
-## Technology Stack
-
-- Node.js
-- Express.js 5
-- MongoDB 7
-- JavaScript (ES Modules)
-- Better Auth JWT
-- JOSE
-- CORS
-- dotenv
-- Nodemon
-
-## API Endpoints
-
-### Base URL
-
-```text
-YOUR_DEPLOYED_SERVER_URL
-```
-
-### Studio APIs
-
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/studios` | Get all studios |
-| GET | `/studios/mine` | Get authenticated user's studios |
-| GET | `/studios/:id` | Get studio details |
-| POST | `/studios` | Create a studio |
-| PATCH | `/studios/:id` | Update a studio |
-| DELETE | `/studios/:id` | Delete a studio |
-
-### Booking APIs
-
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/bookings/availability/:studioId` | Check studio availability |
-| GET | `/bookings/mine` | Get user's bookings |
-| GET | `/bookings/hosting` | Get hosted studio bookings |
-| POST | `/bookings` | Create a booking |
-| PATCH | `/bookings/:id/cancel` | Cancel a booking |
-| PATCH | `/bookings/:id/status` | Update booking status |
-
-### Review APIs
-
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/reviews/studio/:studioId` | Get studio reviews |
-| POST | `/reviews` | Submit a review |
-
-### Wishlist APIs
-
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/wishlist/ids` | Get saved studio IDs |
-| GET | `/wishlist` | Get wishlist studios |
-| POST | `/wishlist/:studioId` | Save a studio |
-| DELETE | `/wishlist/:studioId` | Remove a saved studio |
-
-### Health Check
-
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/` | Check server status |
-
-## Installation and Local Setup
-
-### Prerequisites
-
-- Node.js (LTS recommended)
-- npm
-- MongoDB database
-- Git
-
-### 1. Clone the Repository
-
 ```bash
 git clone https://github.com/mdriyan143/studio_server.git
-```
-
-### 2. Navigate to the Server Directory
-
-```bash
 cd studio_server
-```
-
-### 3. Install Dependencies
-
-```bash
 npm install
 ```
 
-### 4. Configure Environment Variables
-
-Create a `.env` file in the project root:
+Create `.env`:
 
 ```env
 PORT=8000
@@ -168,100 +28,63 @@ DB_NAME=studiospace
 CLIENT_URL=http://localhost:3000
 ```
 
-**Environment Variable Description:**
-
-- `PORT`: Backend server port.
-- `MONGODB_URI`: MongoDB connection string.
-- `DB_NAME`: MongoDB database name.
-- `CLIENT_URL`: Frontend URL used for CORS and Better Auth JWKS verification.
-
-### 5. Start the Development Server
+Run:
 
 ```bash
-node index.js
+npm start      # node index.js
+npm run dev    # nodemon index.js
 ```
 
-Alternatively, use Nodemon:
+Open http://localhost:8000/ and you should see `{"success":true,"message":"StudioSpace server is running!"}`.
 
-```bash
-npx nodemon index.js
-```
+`CLIENT_URL` must match the client URL exactly (no trailing slash). The server uses it for CORS and to load public keys from `CLIENT_URL/api/auth/jwks`.
 
-The server will run at:
+## Security (JWT)
 
-```text
-http://localhost:8000
-```
+Users log in with Better Auth, which keeps the session in an HTTPOnly cookie. Protected calls go through the client's `/api/proxy`, which creates a JWT on the server and sends it as a Bearer token. This server verifies it with the Better Auth JWKS and returns `401 Unauthorized` if it is missing or invalid.
 
-### 6. Verify Server Status
+## Double-Booking Prevention
 
-Open the following URL:
+Before a booking is saved, and again when a host confirms it, the server looks for a Confirmed booking on the same studio and date whose time overlaps. If one exists it returns `409` with a clear message.
 
-```text
-http://localhost:8000/
-```
+## API Endpoints
 
-Expected response:
+`Auth` = needs a valid Bearer token.
 
-```json
-{
-  "success": true,
-  "message": "StudioSpace server is running!"
-}
-```
-
-## Authentication and Security
-
-- Better Auth provides authentication through the frontend.
-- The backend verifies JWT tokens using the Better Auth JWKS endpoint.
-- Protected API requests require a valid Bearer token in the Authorization header.
-- Invalid or expired tokens receive a `401 Unauthorized` response.
-- Authenticated user information is attached to the request for protected operations.
-- CORS is configured to allow requests from the frontend with credentials.
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | `/` | No | Health check |
+| GET | `/studios` | No | List studios (`?limit`, `?category`, `?search`) |
+| GET | `/studios/mine` | Yes | My studios |
+| GET | `/studios/:id` | No | Studio details |
+| POST | `/studios` | Yes | Add studio |
+| PATCH | `/studios/:id` | Yes (owner) | Update studio |
+| DELETE | `/studios/:id` | Yes (owner) | Delete studio |
+| GET | `/bookings/availability/:studioId?date=` | No | Confirmed slots for a date |
+| GET | `/bookings/mine` | Yes | My bookings |
+| GET | `/bookings/hosting` | Yes | Bookings on my studios |
+| POST | `/bookings` | Yes | Create booking (Pending) |
+| PATCH | `/bookings/:id/cancel` | Yes | Cancel my pending booking |
+| PATCH | `/bookings/:id/status` | Yes (host) | Confirm / Complete / Cancel |
+| GET | `/reviews/studio/:studioId` | No | Studio reviews |
+| POST | `/reviews` | Yes | Add review |
+| GET | `/wishlist/ids` | Yes | Saved studio IDs |
+| GET | `/wishlist` | Yes | Saved studios |
+| POST | `/wishlist/:studioId` | Yes | Save a studio |
+| DELETE | `/wishlist/:studioId` | Yes | Remove a saved studio |
 
 ## Project Structure
 
 ```text
 studio_server/
-│
-├── config/
-│   └── db.js
-│
-├── middleware/
-│   └── verifyToken.js
-│
-├── routes/
-│   ├── studioRoutes.js
-│   ├── bookingRoutes.js
-│   ├── reviewRoutes.js
-│   └── wishlistRoutes.js
-│
-├── .gitignore
+├── config/db.js
+├── middleware/verifyToken.js
+├── routes/ (studioRoutes, bookingRoutes, reviewRoutes, wishlistRoutes)
 ├── index.js
 ├── package.json
-├── package-lock.json
 └── vercel.json
 ```
 
 ## Deployment
 
-The backend can be deployed using platforms such as Vercel or Render.
-
-Configure the required environment variables in the deployment platform:
-
-- `PORT`
-- `MONGODB_URI`
-- `DB_NAME`
-- `CLIENT_URL`
-
-Make sure `CLIENT_URL` points to the deployed frontend so that CORS and JWT verification work correctly.
-
-## Project Submission
-
-- **Client Repository:** https://github.com/mdriyan143/studio-space
-- **Server Repository:** https://github.com/mdriyan143/studio_server
-- **Live Website:** https://studio-space-mdriyan143.vercel.app/
-
----
-
-**StudioSpace Backend** — Powering creative workspace discovery, studio management, and seamless booking experiences.
+Deployed on Vercel. Set `MONGODB_URI`, `DB_NAME` and `CLIENT_URL` (the deployed client URL) in the project environment variables.
