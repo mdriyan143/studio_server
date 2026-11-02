@@ -1,6 +1,6 @@
 # StudioSpace — Backend Server
 
-REST API for StudioSpace (Express.js + MongoDB). It handles studios, bookings, reviews and wishlists, and verifies Better Auth JWTs.
+REST API for StudioSpace, built with Express and MongoDB. It handles studios, bookings, reviews, wishlists and notifications, and verifies Better Auth JWTs.
 
 - **Live Site:** https://studio-space-mdriyan143.vercel.app/
 - **API Base URL:** https://studio-server-zeta.vercel.app/
@@ -19,6 +19,15 @@ cd studio_server
 npm install
 ```
 
+Add these scripts to `package.json` (they are not there yet):
+
+```json
+"scripts": {
+  "start": "node index.js",
+  "dev": "nodemon index.js"
+}
+```
+
 Create `.env`:
 
 ```env
@@ -31,21 +40,26 @@ CLIENT_URL=http://localhost:3000
 Run:
 
 ```bash
-npm start      # node index.js
-npm run dev    # nodemon index.js
+npm run dev
 ```
 
 Open http://localhost:8000/ and you should see `{"success":true,"message":"StudioSpace server is running!"}`.
 
-`CLIENT_URL` must match the client URL exactly (no trailing slash). The server uses it for CORS and to load public keys from `CLIENT_URL/api/auth/jwks`.
+`CLIENT_URL` must match the client URL exactly (no trailing slash). It is used for CORS and to load the public keys from `CLIENT_URL/api/auth/jwks`.
 
 ## Security (JWT)
 
-Users log in with Better Auth, which keeps the session in an HTTPOnly cookie. Protected calls go through the client's `/api/proxy`, which creates a JWT on the server and sends it as a Bearer token. This server verifies it with the Better Auth JWKS and returns `401 Unauthorized` if it is missing or invalid.
+Users log in with Better Auth on the client. Protected calls go through the client's `/api/proxy`, which creates a JWT and sends it as a Bearer token. `verifyToken` checks it with the Better Auth JWKS and returns `401` if it is missing, expired or invalid. The user id, email, name and image are read from the token, never from the request body.
 
-## Double-Booking Prevention
+## Booking Rules
 
-Before a booking is saved, and again when a host confirms it, the server looks for a Confirmed booking on the same studio and date whose time overlaps. If one exists it returns `409` with a clear message.
+- Status flow: `Pending` → `Confirmed` → `Completed`, or `Cancelled`.
+- Date must not be in the past, and end time must be after start time.
+- You can't book your own studio.
+- **Double-booking prevention:** before a booking is saved, and again when the host confirms it, the server looks for a Confirmed booking on the same studio and date with an overlapping time. If one exists it returns `409`.
+- A guest can cancel only their own Pending booking. Only the host can confirm, decline or complete.
+- Reviews need a Completed booking, and the studio's average rating is recalculated after each review.
+- Booking changes create a notification for the other user. A failed notification never breaks the booking.
 
 ## API Endpoints
 
@@ -54,7 +68,7 @@ Before a booking is saved, and again when a host confirms it, the server looks f
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | GET | `/` | No | Health check |
-| GET | `/studios` | No | List studios (`?limit`, `?category`, `?search`) |
+| GET | `/studios` | No | List studios (`?limit`, `?category`, `?search`, `?ownerId`) |
 | GET | `/studios/mine` | Yes | My studios |
 | GET | `/studios/:id` | No | Studio details |
 | POST | `/studios` | Yes | Add studio |
@@ -72,6 +86,9 @@ Before a booking is saved, and again when a host confirms it, the server looks f
 | GET | `/wishlist` | Yes | Saved studios |
 | POST | `/wishlist/:studioId` | Yes | Save a studio |
 | DELETE | `/wishlist/:studioId` | Yes | Remove a saved studio |
+| GET | `/notifications` | Yes | Latest 20 notifications and unread count |
+| PATCH | `/notifications/read-all` | Yes | Mark all as read |
+| PATCH | `/notifications/:id/read` | Yes | Mark one as read |
 
 ## Project Structure
 
@@ -79,7 +96,13 @@ Before a booking is saved, and again when a host confirms it, the server looks f
 studio_server/
 ├── config/db.js
 ├── middleware/verifyToken.js
-├── routes/ (studioRoutes, bookingRoutes, reviewRoutes, wishlistRoutes)
+├── routes/
+│   ├── studioRoutes.js
+│   ├── bookingRoutes.js
+│   ├── reviewRoutes.js
+│   ├── wishlistRoutes.js
+│   └── notificationRoutes.js
+├── utils/notify.js
 ├── index.js
 ├── package.json
 └── vercel.json
@@ -87,4 +110,4 @@ studio_server/
 
 ## Deployment
 
-Deployed on Vercel. Set `MONGODB_URI`, `DB_NAME` and `CLIENT_URL` (the deployed client URL) in the project environment variables.
+Deployed on Vercel (`vercel.json` routes everything to `index.js`). Set `MONGODB_URI`, `DB_NAME` and `CLIENT_URL` (the deployed client URL) in the project environment variables.
